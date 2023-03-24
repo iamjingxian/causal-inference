@@ -1,4 +1,4 @@
-create table mimiciv_derived.steroids_unique_subject_id as
+create table mimiciv_derived.steroid_unique_subject_id as
 select distinct subject_id
 from mimiciv_hosp.pharmacy natural join mimiciv_hosp.prescriptions
 where medication like '%hydrocortisone%' 
