@@ -194,3 +194,77 @@ from mimiciv_derived.temp8 temp8 left join mimiciv_derived.first_day_lab ch on (
 select *
 from mimiciv_derived.temp9
 
+create table mimiciv_derived.temp10 as
+select temp9.*, fgcs.gcs_min
+from mimiciv_derived.temp9 temp9 left join mimiciv_derived.first_day_gcs fgcs
+on (temp9.stay_id = fgcs.stay_id)
+
+select *
+from mimiciv_derived.temp10
+
+drop table if exists mimiciv_derived.temp11;
+create table mimiciv_derived.temp11 as
+select distinct temp10.*, oasis.oasis, oasis.oasis_prob
+from mimiciv_derived.temp10 temp10 left join mimiciv_derived.oasis oasis
+on (temp10.stay_id = oasis.stay_id)
+
+select *
+from mimiciv_derived.temp11
+
+drop table if exists mimiciv_derived.temp12;
+create table mimiciv_derived.temp12 as
+select temp11.*,
+CASE 
+WHEN stay_id in (select stay_id from mimiciv_derived.ventilation) THEN 1
+WHEN stay_id not in (select stay_id from mimiciv_derived.ventilation) THEN 0
+end ventilation
+from mimiciv_derived.temp11 temp11
+
+select *
+from mimiciv_derived.temp12
+
+drop table if exists mimiciv_derived.temp13;
+create table mimiciv_derived.temp13 as
+select temp12.*, flab.bilirubin_total_min, flab.bilirubin_total_max
+from mimiciv_derived.temp12 temp12 left join mimiciv_derived.first_day_lab flab
+on(temp12.stay_id = flab.stay_id)
+
+update mimiciv_derived.temp13 set 
+days_interval_mortality = dod - icu_intime::Date
+
+alter table mimiciv_derived.temp13 add column icu_freeday28 integer
+update mimiciv_derived.temp13 set
+icu_freeday28 = 28 - ceiling((DATE_PART('day', icu_outtime::timestamp - icu_intime::timestamp) * 24 + DATE_PART('hour', icu_outtime::timestamp - icu_intime::timestamp)) / 24)
+
+drop table if exists mimiciv_derived.ventilation_cohort;
+create table mimiciv_derived.ventilation_cohort as
+select *
+from mimiciv_derived.ventilation
+where stay_id in (
+select stay_id from mimiciv_derived.temp13)
+
+alter table mimiciv_derived.ventilation_cohort add column ventilation_day integer
+
+update mimiciv_derived.ventilation_cohort set
+ventilation_day = ceiling((DATE_PART('day', endtime::timestamp - starttime::timestamp) * 24 + DATE_PART('hour', endtime::timestamp - starttime::timestamp)) / 24)
+
+drop table if exists mimiciv_derived.MVfree_cohort;
+create table mimiciv_derived.MVfree_cohort as
+select stay_id, 28 - sum(ventilation_day) as days28_MVfree
+from mimiciv_derived.ventilation_cohort
+group by stay_id
+
+create table mimiciv_derived.final_table as
+select temp13.*, days28_MVfree
+from mimiciv_derived.temp13 temp13 left join mimiciv_derived.MVfree_cohort
+on(temp13.stay_id = MVfree_cohort.stay_id)
+
+select *
+from mimiciv_derived.final_table
+
+update mimiciv_derived.final_table set
+days_interval_mortality = dod - icu_intime::Date
+
+select *
+from mimiciv_derived.final_table
+
