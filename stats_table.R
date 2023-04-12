@@ -20,7 +20,7 @@ write.csv(tab_df, "table1_cohort_final.csv")
 
 
 ## 1. doubly robust with unbalanced covariates
-full_data <- read.csv('cohort_final_dummies.csv')
+full_data <- read.csv('cohort_matched.csv')
 outcome = full_data$X28_mortality
 treatment = full_data$treatment
 weight = full_data$weight
